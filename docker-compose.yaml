@@ -1,6 +1,21 @@
 version: '3.7'
 
 services:
+  lego:
+    image: goacme/lego
+    env_file:
+      - ./.env
+    command: >
+      --email ${CERTBOT_EMAIL}
+      --dns pdns
+      --domains ${CONSOLE_FQDN}
+      --domains ${API_FQDN}
+      --path /lego
+      --accept-tos
+      run
+    volumes:
+      - lego-certificates:/.lego
+
   minio:
     image: minio/minio:RELEASE.2021-08-05T22-01-19Z
     restart: unless-stopped
@@ -12,8 +27,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASS:-minio123}
       MINIO_REGION_NAME: ${MINIO_REGION_NAME}
-      MINIO_BROWSER_REDIRECT_URL: https://${FQDN}
-      MINIO_SERVER_URL: https://${FQDN}:9000
+      MINIO_BROWSER_REDIRECT_URL: https://${CONSOLE_FQDN}
+      MINIO_SERVER_URL: https://${API_FQDN}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -27,27 +42,16 @@ services:
     image: nginx:1.21.1
     volumes:
       - ./nginx/conf.d:/etc/nginx/templates:ro
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
+      - lego-certificates:/etc/nginx/certs
     environment:
-      - NGINX_HOST=${FQDN}
+      - CONSOLE_HOST=${CONSOLE_FQDN}
+      - API_HOST=${API_FQDN}
     ports:
       - "443:443"
       - "80:80"
-      - "9000:9000"
     depends_on:
       - minio
-      - certbot
-
-  certbot:
-    image: certbot/certbot
-    ports:
-      - "88:80"
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-    command: certonly --standalone --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${FQDN}
+      - lego
 
 volumes:
-  certbot-etc:
-  certbot-var:
+  lego-certificates:
