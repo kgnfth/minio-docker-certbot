@@ -10,11 +10,21 @@ services:
       --dns pdns
       --domains ${CONSOLE_FQDN}
       --domains ${API_FQDN}
+      --domains ${PORTAINER_FQDN}
       --path /lego
       --accept-tos
       run
     volumes:
-      - lego-certificates:/.lego
+      - lego-accounts:/lego/accounts
+      - lego-certificates:/lego
+
+  portainer:
+    image: portainer/portainer
+    command: -H unix:///var/run/docker.sock
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
 
   minio:
     image: minio/minio:RELEASE.2021-08-05T22-01-19Z
@@ -46,12 +56,16 @@ services:
     environment:
       - CONSOLE_HOST=${CONSOLE_FQDN}
       - API_HOST=${API_FQDN}
+      - PORTAINER_HOST=${PORTAINER_FQDN}
     ports:
       - "443:443"
       - "80:80"
     depends_on:
+      - portainer
       - minio
       - lego
 
 volumes:
   lego-certificates:
+  lego-accounts:
+  portainer_data:
